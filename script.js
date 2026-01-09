@@ -1,52 +1,81 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-const startBtn = document.getElementById("startBtn");
+const easyBtn = document.getElementById("easyBtn");
+const hardBtn = document.getElementById("hardBtn");
 const restartBtn = document.getElementById("restartBtn");
+const levelText = document.getElementById("levelText");
 
 const colors = ["red", "blue", "green", "yellow"];
-
 let game = null;
 
+function getLevelText(score) {
+    if (score <= 10) return "😴";
+    if (score <= 20) return "😬";
+    if (score <= 30) return "😐";
+    if (score <= 40) return "🙂";
+    if (score <= 49) return "⭐";
+    return "🔥";
+}
+
 class CenterCircle {
-    constructor() {
+    constructor(hard) {
         this.radius = 30;
-        this.changeColor();
+        this.hard = hard;
+        this.change();
     }
 
-    changeColor() {
+    change() {
         this.color = colors[Math.floor(Math.random() * colors.length)];
+
+        if (this.hard) {
+            this.x = Math.random() * (canvas.width - 60) + 30;
+            this.y = Math.random() * (canvas.height - 60) + 30;
+        } else {
+            this.x = canvas.width / 2;
+            this.y = canvas.height / 2;
+        }
     }
 
     draw() {
         ctx.beginPath();
-        ctx.arc(canvas.width / 2, canvas.height / 2, this.radius, 0, Math.PI * 2);
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
         ctx.fillStyle = this.color;
         ctx.fill();
     }
 }
 
 class Block {
-    constructor(color, existingBlocks) {
+    constructor(color, blocks, center) {
         this.size = 40;
         this.color = color;
 
-        let valid = false;
-        while (!valid) {
+        let ok = false;
+        while (!ok) {
             this.x = Math.random() * (canvas.width - this.size);
             this.y = Math.random() * (canvas.height - this.size);
-            valid = true;
+            ok = true;
 
-            for (let b of existingBlocks) {
+            for (let b of blocks) {
                 if (
                     this.x < b.x + b.size &&
                     this.x + this.size > b.x &&
                     this.y < b.y + b.size &&
                     this.y + this.size > b.y
                 ) {
-                    valid = false;
+                    ok = false;
                     break;
                 }
+            }
+
+            const bx = this.x + this.size / 2;
+            const by = this.y + this.size / 2;
+            const dx = bx - center.x;
+            const dy = by - center.y;
+            const dist = Math.sqrt(dx * dx + dy * dy);
+
+            if (dist < center.radius + this.size / 2 + 5) {
+                ok = false;
             }
         }
     }
@@ -56,119 +85,97 @@ class Block {
         ctx.fillRect(this.x, this.y, this.size, this.size);
     }
 
-    isClicked(mx, my) {
-        return (
-            mx >= this.x &&
-            mx <= this.x + this.size &&
-            my >= this.y &&
-            my <= this.y + this.size
-        );
+    isClicked(x, y) {
+        return x >= this.x && x <= this.x + this.size &&
+            y >= this.y && y <= this.y + this.size;
     }
 }
 
 class Game {
-    constructor() {
-        this.center = new CenterCircle();
+    constructor(hard) {
+        this.hard = hard;
+        this.center = new CenterCircle(hard);
         this.blocks = [];
         this.score = 0;
-        this.timeLeft = 60;
+        this.time = 60;
         this.running = true;
 
+        this.spawn();
         this.updateUI();
-        this.spawnBlocks();
         this.startTimer();
         this.loop();
     }
 
     updateUI() {
         document.getElementById("score").textContent = this.score;
-        document.getElementById("time").textContent = this.timeLeft;
+        document.getElementById("time").textContent = this.time;
+        levelText.textContent = "Aktuální: " + getLevelText(this.score);
     }
 
-    spawnBlocks() {
+    spawn() {
         this.blocks = [];
-        colors.forEach(color => {
-            this.blocks.push(new Block(color, this.blocks));
+        colors.forEach(c => {
+            this.blocks.push(new Block(c, this.blocks, this.center));
         });
     }
 
     startTimer() {
-        this.timer = setInterval(() => {
-            if (this.timeLeft > 0) {
-                this.timeLeft--;
+        this.interval = setInterval(() => {
+            if (this.time > 0) {
+                this.time--;
                 this.updateUI();
-            } else {
-                this.endGame();
-            }
+            } else this.end();
         }, 1000);
     }
 
-    handleClick(x, y) {
+    click(x, y) {
         if (!this.running) return;
+        const b = this.blocks.find(b => b.isClicked(x, y));
+        if (!b) return;
 
-        const clickedBlocks = this.blocks.filter(b => b.isClicked(x, y));
-        if (clickedBlocks.length === 0) return;
-
-        const block = clickedBlocks[0];
-
-        if (block.color === this.center.color) {
+        if (b.color === this.center.color) {
             this.score++;
-            this.center.changeColor();
-            this.spawnBlocks();
+            this.center.change();
+            this.spawn();
             this.updateUI();
-        } else {
-            this.endGame();
-        }
+        } else this.end();
     }
 
-    endGame() {
+    end() {
         this.running = false;
-        clearInterval(this.timer);
+        clearInterval(this.interval);
         restartBtn.disabled = false;
     }
 
     draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-
         this.center.draw();
         this.blocks.forEach(b => b.draw());
-
-        if (!this.running) {
-            ctx.fillStyle = "white";
-            ctx.font = "30px Arial";
-            ctx.fillText("KONEC HRY", 160, 175);
-            ctx.font = "22px Arial";
-            ctx.fillText(`Skóre: ${this.score}`, 190, 210);
-        }
     }
 
     loop() {
         this.draw();
-        if (this.running) {
-            requestAnimationFrame(() => this.loop());
-        }
+        if (this.running) requestAnimationFrame(() => this.loop());
     }
 }
 
 canvas.addEventListener("click", e => {
     if (!game) return;
-
-    const rect = canvas.getBoundingClientRect();
-    const x = e.clientX - rect.left;
-    const y = e.clientY - rect.top;
-
-    game.handleClick(x, y);
+    const r = canvas.getBoundingClientRect();
+    game.click(e.clientX - r.left, e.clientY - r.top);
 });
 
-startBtn.addEventListener("click", () => {
-    if (!game) {
-        game = new Game();
-        startBtn.style.display = "none";
-        restartBtn.disabled = true;
-    }
-});
-
-restartBtn.addEventListener("click", () => {
-    game = new Game();
+easyBtn.onclick = () => {
+    game = new Game(false);
     restartBtn.disabled = true;
-});
+};
+
+hardBtn.onclick = () => {
+    game = new Game(true);
+    restartBtn.disabled = true;
+};
+
+restartBtn.onclick = () => {
+    game = new Game(game.hard);
+    restartBtn.disabled = true;
+};

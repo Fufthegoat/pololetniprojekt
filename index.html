@@ -7,22 +7,41 @@
 </head>
 <body>
 
-<h1> Color Switch Reflex</h1>
+<h1>Color Switch Reflex</h1>
 
 <p class="info">
-    ⏱️ Čas: <span id="time">60</span>s |
-    🏆 Skóre: <span id="score">0</span>
+    Čas: <span id="time">60</span>s |
+    Skóre: <span id="score">0</span>
 </p>
 
-<div class="buttons">
-    <button id="startBtn">▶️ Start hry</button>
-    <button id="restartBtn" disabled>🔁 Restart</button>
+<div class="center-wrapper">
+
+    <div class="left-panel">
+        <div class="buttons">
+            <button id="easyBtn">Easy</button>
+            <button id="hardBtn">Hard</button>
+            <button id="restartBtn" disabled>Restart</button>
+        </div>
+
+        <div class="legend">
+            <h3>Obtížnost podle skóre</h3>
+            <ul>
+                <li>0–10 😴</li>
+                <li>11–20 😬</li>
+                <li>21–30 😐</li>
+                <li>31–40 🙂</li>
+                <li>41–49 ⭐</li>
+                <li>50+ 🔥</li>
+            </ul>
+            <p id="levelText">Aktuální: 😴</p>
+        </div>
+    </div>
+
+    <canvas id="gameCanvas" width="500" height="400"></canvas>
 </div>
 
-<canvas id="gameCanvas" width="500" height="400"></canvas>
-
 <p class="hint">
-    Klikni na blok se stejnou barvou jako střed
+    Klikni na blok se stejnou barvou jako kolečko
 </p>
 
 <script src="script.js"></script>
