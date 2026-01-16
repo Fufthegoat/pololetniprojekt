@@ -1,144 +1,195 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-const easyBtn = document.getElementById("easyBtn");
-const hardBtn = document.getElementById("hardBtn");
-const restartBtn = document.getElementById("restartBtn");
+const timeEl = document.getElementById("time");
+const scoreEl = document.getElementById("score");
 const levelText = document.getElementById("levelText");
 
-const colors = ["red", "blue", "green", "yellow"];
+const easyBtn = document.getElementById("easyBtn");
+const mediumBtn = document.getElementById("mediumBtn");
+const hardBtn = document.getElementById("hardBtn");
+const restartBtn = document.getElementById("restartBtn");
+
 let game = null;
 
-function getLevelText(score) {
-    if (score <= 10) return "😴";
-    if (score <= 20) return "😬";
-    if (score <= 30) return "😐";
-    if (score <= 40) return "🙂";
-    if (score <= 49) return "⭐";
-    return "🔥";
+const COLORS = ["red", "green", "blue", "yellow", "purple", "cyan"];
+
+function randomColor() {
+    return COLORS[Math.floor(Math.random() * COLORS.length)];
 }
 
-class CenterCircle {
-    constructor(hard) {
-        this.radius = 30;
-        this.hard = hard;
-        this.change();
-    }
-
-    change() {
-        this.color = colors[Math.floor(Math.random() * colors.length)];
-
-        if (this.hard) {
-            this.x = Math.random() * (canvas.width - 60) + 30;
-            this.y = Math.random() * (canvas.height - 60) + 30;
-        } else {
-            this.x = canvas.width / 2;
-            this.y = canvas.height / 2;
-        }
-    }
-
-    draw() {
-        ctx.beginPath();
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
-        ctx.fillStyle = this.color;
-        ctx.fill();
-    }
+function randomPos(min, max) {
+    return Math.random() * (max - min) + min;
 }
 
 class Block {
-    constructor(color, blocks, center) {
+    constructor(x, y, color, game) {
+        this.x = x;
+        this.y = y;
         this.size = 40;
         this.color = color;
+        this.game = game;
 
-        let ok = false;
-        while (!ok) {
-            this.x = Math.random() * (canvas.width - this.size);
-            this.y = Math.random() * (canvas.height - this.size);
-            ok = true;
+        if (game.mode === "hard") {
+            this.vx = (Math.random() - 0.5) * 2;
+            this.vy = (Math.random() - 0.5) * 2;
+        } else {
+            this.vx = 0;
+            this.vy = 0;
+        }
+    }
 
-            for (let b of blocks) {
-                if (
-                    this.x < b.x + b.size &&
-                    this.x + this.size > b.x &&
-                    this.y < b.y + b.size &&
-                    this.y + this.size > b.y
-                ) {
-                    ok = false;
-                    break;
-                }
-            }
+    update() {
+        if (this.game.mode === "hard") {
+            this.x += this.vx;
+            this.y += this.vy;
 
-            const bx = this.x + this.size / 2;
-            const by = this.y + this.size / 2;
-            const dx = bx - center.x;
-            const dy = by - center.y;
-            const dist = Math.sqrt(dx * dx + dy * dy);
-
-            if (dist < center.radius + this.size / 2 + 5) {
-                ok = false;
-            }
+            if (this.x <= 0 || this.x >= canvas.width - this.size) this.vx *= -1;
+            if (this.y <= 0 || this.y >= canvas.height - this.size) this.vy *= -1;
         }
     }
 
     draw() {
+        this.update();
         ctx.fillStyle = this.color;
         ctx.fillRect(this.x, this.y, this.size, this.size);
     }
 
-    isClicked(x, y) {
-        return x >= this.x && x <= this.x + this.size &&
-            y >= this.y && y <= this.y + this.size;
+    contains(px, py) {
+        return (
+            px >= this.x &&
+            px <= this.x + this.size &&
+            py >= this.y &&
+            py <= this.y + this.size
+        );
+    }
+}
+
+
+class CenterCircle {
+    constructor(color) {
+        this.radius = 28;
+        this.color = color;
+
+        this.x = canvas.width / 2;
+        this.y = canvas.height / 2;
+
+        this.vx = 1.4;
+        this.vy = 1.2;
+    }
+
+    randomizePosition() {
+        this.x = randomPos(this.radius, canvas.width - this.radius);
+        this.y = randomPos(this.radius, canvas.height - this.radius);
+    }
+
+    update(game) {
+        if (game.mode === "hard") {
+            this.x += this.vx;
+            this.y += this.vy;
+
+            if (this.x < this.radius || this.x > canvas.width - this.radius) this.vx *= -1;
+            if (this.y < this.radius || this.y > canvas.height - this.radius) this.vy *= -1;
+        }
+    }
+
+    draw(game) {
+        this.update(game);
+        ctx.beginPath();
+        ctx.fillStyle = this.color;
+        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.fill();
     }
 }
 
 class Game {
-    constructor(hard) {
-        this.hard = hard;
-        this.center = new CenterCircle(hard);
-        this.blocks = [];
+    constructor(mode) {
+        this.mode = mode;
+        this.running = true;
         this.score = 0;
         this.time = 60;
-        this.running = true;
 
-        this.spawn();
-        this.updateUI();
+        this.centerColor = randomColor();
+        this.center = new CenterCircle(this.centerColor);
+
+        this.blocks = [];
+        this.createBlocks();
+
         this.startTimer();
         this.loop();
     }
 
-    updateUI() {
-        document.getElementById("score").textContent = this.score;
-        document.getElementById("time").textContent = this.time;
-        levelText.textContent = "Aktuální: " + getLevelText(this.score);
-    }
-
-    spawn() {
+    createBlocks() {
         this.blocks = [];
-        colors.forEach(c => {
-            this.blocks.push(new Block(c, this.blocks, this.center));
-        });
+        const correctIndex = Math.floor(Math.random() * 6);
+
+        for (let i = 0; i < 6; i++) {
+            const color = (i === correctIndex)
+                ? this.centerColor
+                : randomColor();
+
+            this.blocks.push(
+                new Block(
+                    Math.random() * 450,
+                    Math.random() * 350,
+                    color,
+                    this
+                )
+            );
+        }
     }
 
-    startTimer() {
-        this.interval = setInterval(() => {
-            if (this.time > 0) {
-                this.time--;
-                this.updateUI();
-            } else this.end();
-        }, 1000);
+    handleCircleMove() {
+        if (this.mode === "medium") {
+            this.center.randomizePosition();
+        }
     }
 
     click(x, y) {
         if (!this.running) return;
-        const b = this.blocks.find(b => b.isClicked(x, y));
-        if (!b) return;
 
-        if (b.color === this.center.color) {
-            this.score++;
-            this.center.change();
-            this.spawn();
-            this.updateUI();
-        } else this.end();
+        for (let b of this.blocks) {
+            if (b.contains(x, y)) {
+
+                this.handleCircleMove();
+
+                if (b.color === this.centerColor) {
+                    this.score++;
+                    scoreEl.textContent = this.score;
+                    this.updateLevel();
+
+                    this.centerColor = randomColor();
+                    this.center.color = this.centerColor;
+                    this.createBlocks();
+                } else {
+                    this.time = Math.max(0, this.time - 2);
+                    timeEl.textContent = this.time;
+                }
+                return;
+            }
+        }
+    }
+
+    startTimer() {
+        timeEl.textContent = this.time;
+        scoreEl.textContent = this.score;
+
+        this.interval = setInterval(() => {
+            this.time--;
+            timeEl.textContent = this.time;
+            if (this.time <= 0) this.end();
+        }, 1000);
+    }
+
+    updateLevel() {
+        const s = this.score;
+        let emoji = "😴";
+        if (s > 10) emoji = "😬";
+        if (s > 20) emoji = "😐";
+        if (s > 30) emoji = "🙂";
+        if (s > 40) emoji = "⭐";
+        if (s >= 50) emoji = "🔥";
+        levelText.textContent = "Aktuální: " + emoji;
     }
 
     end() {
@@ -149,7 +200,7 @@ class Game {
 
     draw() {
         ctx.clearRect(0, 0, canvas.width, canvas.height);
-        this.center.draw();
+        this.center.draw(this);
         this.blocks.forEach(b => b.draw());
     }
 
@@ -166,16 +217,21 @@ canvas.addEventListener("click", e => {
 });
 
 easyBtn.onclick = () => {
-    game = new Game(false);
+    game = new Game("easy");
+    restartBtn.disabled = true;
+};
+
+mediumBtn.onclick = () => {
+    game = new Game("medium");
     restartBtn.disabled = true;
 };
 
 hardBtn.onclick = () => {
-    game = new Game(true);
+    game = new Game("hard");
     restartBtn.disabled = true;
 };
 
 restartBtn.onclick = () => {
-    game = new Game(game.hard);
+    game = new Game(game.mode);
     restartBtn.disabled = true;
 };
