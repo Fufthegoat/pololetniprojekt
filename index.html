@@ -4,6 +4,10 @@
     <meta charset="UTF-8">
     <title>Color Switch Reflex</title>
     <link rel="stylesheet" href="style.css">
+
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Press+Start+2P&display=swap" rel="stylesheet">
 </head>
 <body>
 
@@ -14,31 +18,18 @@
     Skóre: <span id="score">0</span>
 </p>
 
-<div class="center-wrapper">
-
-    <div class="left-panel">
-        <div class="buttons">
-            <button id="easyBtn">Easy</button>
-            <button id="mediumBtn">Medium</button>
-            <button id="hardBtn">Hard</button>
-            <button id="restartBtn" disabled>Restart</button>
-        </div>
-
-        <div class="legend">
-            <h3>Obtížnost podle skóre</h3>
-            <ul>
-                <li>0–10 😴</li>
-                <li>11–20 😬</li>
-                <li>21–30 😐</li>
-                <li>31–40 🙂</li>
-                <li>41–49 ⭐</li>
-                <li>50+ 🔥</li>
-            </ul>
-            <p id="levelText">Aktuální: 😴</p>
-        </div>
-    </div>
-
+<div class="canvas-wrapper">
     <canvas id="gameCanvas" width="500" height="400"></canvas>
+    <div class="buttons-panel">
+        <button id="easyBtn">Easy</button>
+        <button id="mediumBtn">Medium</button>
+        <button id="hardBtn">Hard</button>
+    </div>
+</div>
+
+<div id="endScreen" class="end-screen hidden">
+    <h2 id="finalText"></h2>
+    <button id="finalRestartBtn">Restart</button>
 </div>
 
 <p class="hint">
