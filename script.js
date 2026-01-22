@@ -1,7 +1,6 @@
 const canvas = document.getElementById("gameCanvas");
 const ctx = canvas.getContext("2d");
 
-
 const timeEl = document.getElementById("time");
 const scoreEl = document.getElementById("score");
 
@@ -117,23 +116,73 @@ class Block {
 // Trida pro stredove kolecko
 class CenterCircle {
     constructor(color, game) {
-        this.radius = 28;
+        this.radius = 28; 
+        this.size = this.radius * 2; 
         this.color = color;
         this.game = game;
-        this.x = canvas.width / 2;
-        this.y = canvas.height / 2;
+
+        if (this.game.mode === "hard") {
+            this.randomizePosition(true);
+        } else {
+            this.x = canvas.width / 2 - this.radius;
+            this.y = canvas.height / 2 - this.radius;
+            this.vx = 0;
+            this.vy = 0;
+        }
     }
 
-    // Nahodna pozice pro medium uroven
-    randomizePosition() {
-        this.x = Math.random() * (canvas.width - this.radius * 2) + this.radius;
-        this.y = Math.random() * (canvas.height - this.radius * 2) + this.radius;
+    randomizePosition(hard = false) {
+        this.x = Math.random() * (canvas.width - this.size);
+        this.y = Math.random() * (canvas.height - this.size);
+        if (hard) {
+            const v = randomVelocity(1.5);
+            this.vx = v.vx;
+            this.vy = v.vy;
+        } else {
+            this.vx = 0;
+            this.vy = 0;
+        }
+    }
+
+    update() {
+        if (this.game.mode !== "hard") return;
+
+        this.x += this.vx;
+        this.y += this.vy;
+
+        // Odraz od hranic
+        if (this.x < 0) { this.x = 0; this.vx *= -1; }
+        if (this.x + this.size > canvas.width) { this.x = canvas.width - this.size; this.vx *= -1; }
+        if (this.y < 0) { this.y = 0; this.vy *= -1; }
+        if (this.y + this.size > canvas.height) { this.y = canvas.height - this.size; this.vy *= -1; }
+
+        
+        for (let b of this.game.blocks) {
+            if (rectsOverlap(this, b)) {
+            
+                this.x -= this.vx;
+                this.y -= this.vy;
+
+                if (this.x + this.size/2 < b.x + b.size/2) this.vx = -Math.abs(this.vx);
+                else this.vx = Math.abs(this.vx);
+
+                if (this.y + this.size/2 < b.y + b.size/2) this.vy = -Math.abs(this.vy);
+                else this.vy = Math.abs(this.vy);
+
+                this.x += this.vx;
+                this.y += this.vy;
+
+                this.x = Math.min(Math.max(this.x, 0), canvas.width - this.size);
+                this.y = Math.min(Math.max(this.y, 0), canvas.height - this.size);
+            }
+        }
     }
 
     draw() {
+        this.update();
         ctx.beginPath();
         ctx.fillStyle = this.color;
-        ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+        ctx.arc(this.x + this.radius, this.y + this.radius, this.radius, 0, Math.PI * 2);
         ctx.fill();
     }
 }
@@ -160,47 +209,61 @@ class Game {
 
     // Vytvori 6 bloku
     createBlocks() {
-        this.blocks = [];
-        const correctIndex = Math.floor(Math.random() * 6);
+    this.blocks = [];
+    const correctIndex = Math.floor(Math.random() * 6);
 
-        for (let i = 0; i < 6; i++) {
-            const color = (i === correctIndex) ? this.centerColor : randomColor();
+    for (let i = 0; i < 6; i++) {
+        const color = (i === correctIndex) ? this.centerColor : randomColor();
 
-            let block;
-            do {
-                block = new Block(
-                    Math.random() * (canvas.width - 40),
-                    Math.random() * (canvas.height - 40),
-                    color,
-                    this
-                );
-            } while (
-                this.blocks.some(b => rectsOverlap(b, block)) ||
-                rectCircleOverlap(block, this.center)
+        let block;
+        let attempts = 0;
+
+        do {
+            block = new Block(
+                Math.random() * (canvas.width - 40),
+                Math.random() * (canvas.height - 40),
+                color,
+                this
             );
+            attempts++;
+            if (attempts > 1000) break; 
+        } while (
+            this.blocks.some(b => rectsOverlap(b, block)) || 
+            (this.center && rectsOverlap(block, this.center)) 
+        );
 
-            this.blocks.push(block);
-        }
+        this.blocks.push(block);
     }
+}
 
     // Kliknuti hrace
     click(x, y) {
-        for (let b of this.blocks) {
-            if (b.contains(x, y)) {
-                if (b.color === this.centerColor) {
-                    this.score++;
-                    scoreEl.textContent = this.score;
-                    this.centerColor = randomColor();
-                    this.center.color = this.centerColor;
-                    this.createBlocks();
-                } else {
-                    this.time = Math.max(0, this.time - 2);
-                    timeEl.textContent = this.time;
+    for (let b of this.blocks) {
+        if (b.contains(x, y)) {
+            if (b.color === this.centerColor) {
+                this.score++;
+                scoreEl.textContent = this.score;
+                this.centerColor = randomColor();
+                this.center.color = this.centerColor;
+
+                if (this.mode === "medium") {
+                    this.center.randomizePosition();
                 }
-                return;
+
+                if (this.mode === "hard") {
+                    this.center.randomizePosition(true);
+                }
+
+                this.createBlocks();
+            } else {
+                this.time = Math.max(0, this.time - 2);
+                timeEl.textContent = this.time;
             }
+            return;
         }
     }
+}
+
 
     // Casovac 1 minuty
     startTimer() {
